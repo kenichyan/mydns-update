@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# --- 設定読み込み ---
+# --- Load configuration ---
 CONF_FILE="/etc/mydns/mydns.conf"
 [[ ! -f "$CONF_FILE" ]] && echo "Error: $CONF_FILE not found." >&2 && exit 1
 source "$CONF_FILE"
 
-# キャッシュディレクトリの準備
+# Prepare cache directory
 mkdir -p "$CACHE_DIR"
 
 log_message() {
@@ -13,7 +13,7 @@ log_message() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "$target_log"
 }
 
-# 現在の外向きIPを取得する関数
+# Function to get the current public IP address
 get_current_ip() {
     local url=$1
     curl -s -m "$TIMEOUT" --connect-timeout "$CONN_TIMEOUT" "$url" | tr -d '[:space:]'
@@ -27,16 +27,16 @@ update_dns() {
     local id_only="${cred%%:*}"
     local cache_file="${CACHE_DIR}/${id_only}_${mode}.lastip"
 
-    # キャッシュされた前回IPを読み込み
+    # Read the previously cached IP
     local last_ip=""
     [[ -f "$cache_file" ]] && last_ip=$(cat "$cache_file")
 
-    # IPが同じならスキップ
+    # Skip if the IP is the same as last time
     if [[ "$current_ip" == "$last_ip" ]]; then
         return 0
     fi
 
-    # 更新実行
+    # Execute the update
     response=$(curl -s -u "${cred}" -A "${USER_AGENT}" -m "${TIMEOUT}" \
         --connect-timeout "${CONN_TIMEOUT}" --fail --globoff "$url" 2>&1)
     
@@ -52,13 +52,13 @@ update_dns() {
     fi
 }
 
-# --- メイン処理 ---
+# --- Main process ---
 
-# 1. まず現在のグローバルIPを取得（ループの外で行うことで効率化）
+# 1. First, obtain the current global IP (do this outside the loop for efficiency)
 [[ "$ENABLE_IPV4" == "yes" ]] && CURRENT_IPV4=$(get_current_ip "$CHECK_IPV4_URL")
 [[ "$ENABLE_IPV6" == "yes" ]] && CURRENT_IPV6=$(get_current_ip "$CHECK_IPV6_URL")
 
-# 2. 各IDごとに比較と通知を実行
+# 2. For each ID, compare and notify if necessary
 for entry in "${MYDNS_CREDENTIALS[@]}"; do
     if [[ "$ENABLE_IPV4" == "yes" && -n "$CURRENT_IPV4" ]]; then
         update_dns "$entry" "$IPV4_URL" "IPv4" "$CURRENT_IPV4"
